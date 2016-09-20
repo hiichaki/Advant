@@ -3,7 +3,9 @@ package com.advant.service;
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.HashMap;
 
+import com.advant.model.Hotel;
 import com.advant.utils.StaticVars;
 import com.advant.utils.StringUtils;
 import com.gargoylesoftware.htmlunit.BrowserVersion;
@@ -13,7 +15,9 @@ import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.WebRequest;
 import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
 import com.gargoylesoftware.htmlunit.html.HtmlButton;
+import com.gargoylesoftware.htmlunit.html.HtmlDivision;
 import com.gargoylesoftware.htmlunit.html.HtmlForm;
+import com.gargoylesoftware.htmlunit.html.HtmlHeading4;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlPasswordInput;
 import com.gargoylesoftware.htmlunit.html.HtmlSpan;
@@ -28,6 +32,7 @@ public class HtmlService {
 	private static void submitForm() {
 		try {
 			webClient.getOptions().setJavaScriptEnabled(true);
+			webClient.getOptions().setDoNotTrackEnabled(true);
 
 			final HtmlPage page1 = webClient.getPage(StaticVars.SITE);
 
@@ -45,7 +50,12 @@ public class HtmlService {
 			System.out.println("login");
 
 		} catch (Exception e) {
-			System.out.println("fail to submit");
+			try {
+				throw (new Throwable("fail to submit"));
+			} catch (Throwable e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
 		}
 
 	}
@@ -75,17 +85,17 @@ public class HtmlService {
 	}
 
 	@SuppressWarnings("unchecked")
-	private static ArrayList<HtmlAnchor> getFirstPage() {
+	private static HtmlPage getFirstPage() {
 		try {
 			HtmlPage page = getPageByRequest();
 			HtmlButton searchBtn = (HtmlButton) page.getElementsByTagName("button").get(0);
 			HtmlPage newPage = searchBtn.click();
 			System.out.println("clicked search");
 			ArrayList<HtmlAnchor> hrefList = (ArrayList<HtmlAnchor>) newPage.getByXPath(StaticVars.F_PRICE_HREF);
-			while(hrefList.isEmpty()) {
+			while (hrefList.isEmpty()) {
 				hrefList = (ArrayList<HtmlAnchor>) newPage.getByXPath(StaticVars.F_PRICE_HREF);
 			}
-			return hrefList;
+			return newPage;
 		} catch (FailingHttpStatusCodeException | IOException e) {
 			System.out.println("failed to click searchBtn");
 			e.printStackTrace();
@@ -93,6 +103,7 @@ public class HtmlService {
 		return null;
 	}
 
+	@SuppressWarnings("unused")
 	private static void clickMore(HtmlPage newPage) {
 		HtmlButton moreBtn = (HtmlButton) newPage.getElementsByTagName("button").get(1);
 		try {
@@ -107,10 +118,10 @@ public class HtmlService {
 	}
 
 	@SuppressWarnings("unchecked")
-	private static void getPrices(ArrayList<HtmlAnchor> hrefList) throws IOException {
+	private static HashMap<String, ArrayList<Integer>> getPrices(HtmlPage newPage) throws IOException {
 		ArrayList<Integer> fPrice = new ArrayList<Integer>();
 		ArrayList<Integer> bPrice = new ArrayList<Integer>();
-//		ArrayList<HtmlAnchor> hrefList = (ArrayList<HtmlAnchor>) newPage.getByXPath(StaticVars.F_PRICE_HREF);
+		ArrayList<HtmlAnchor> hrefList = (ArrayList<HtmlAnchor>) newPage.getByXPath(StaticVars.F_PRICE_HREF);
 		System.out.println("start anchoring");
 		int i = 0;
 		for (HtmlAnchor href : hrefList) {
@@ -126,8 +137,107 @@ public class HtmlService {
 		}
 		System.out.println("done anchoring");
 
+		HashMap<String, ArrayList<Integer>> map = new HashMap<String, ArrayList<Integer>>();
+		map.put("fPrice", fPrice);
+		map.put("bPrice", bPrice);
 		show(fPrice, bPrice);
+		return map;
 
+	}
+
+	@SuppressWarnings("unchecked")
+	private static HashMap<String, ArrayList<String>> getName(HtmlPage newPage) {
+		ArrayList<HtmlHeading4> hrefList = (ArrayList<HtmlHeading4>) newPage.getByXPath(StaticVars.HOTEL_NAME_HREF);
+		ArrayList<String> countryList = new ArrayList<String>();
+		ArrayList<String> townList = new ArrayList<String>();
+		ArrayList<String> townFromList = new ArrayList<String>();
+		for (HtmlHeading4 href : hrefList) {
+			String text = href.getElementsByTagName("span").get(0).asText();
+			int coma = text.indexOf(',');
+			int nl = text.indexOf("\n");
+			String country = text.substring(0, coma);
+			String town = text.substring(coma + 1, nl - 1);
+			String townFrom = text.substring(nl);
+			countryList.add(country);
+			townList.add(StringUtils.getOnlyWords(town));
+			townFromList.add(StringUtils.getOnlyWords(townFrom));
+
+		}
+
+		HashMap<String, ArrayList<String>> map = new HashMap<String, ArrayList<String>>();
+		map.put("country", countryList);
+		map.put("town", townList);
+		map.put("townFrom", townFromList);
+
+		return map;
+	}
+
+	@SuppressWarnings("unchecked")
+	public static HashMap<String, ArrayList<?>> getInfo(HtmlPage newPage) {
+		ArrayList<HtmlDivision> list = (ArrayList<HtmlDivision>) newPage.getByXPath(StaticVars.HOTEL_INF_MAIN);
+		ArrayList<Integer> starsList = new ArrayList<Integer>();
+		ArrayList<String> hotelRoomList = new ArrayList<String>();
+		ArrayList<String> foodList = new ArrayList<String>();
+		ArrayList<Integer> nightsList = new ArrayList<Integer>();
+
+		ArrayList<HtmlDivision> listDate = (ArrayList<HtmlDivision>) newPage
+				.getByXPath("//div[@class='hotel-inf-descr hotel-inf-descr_date']");
+		ArrayList<String> fromToDateList = new ArrayList<String>();
+
+		for (int i = 0; i < listDate.size(); ++i) {
+			fromToDateList.add(listDate.get(i).asText());
+		}
+
+		for (int i = 0; i < list.size() - 4; i += 4) {
+			starsList.add(StringUtils.getNumber(list.get(i).asText()));
+			hotelRoomList.add(list.get(i + 1).asText());
+			foodList.add(list.get(i + 2).asText());
+			nightsList.add(StringUtils.getNumber(list.get(i + 3).asText()));
+		}
+
+		HashMap<String, ArrayList<?>> map = new HashMap<String, ArrayList<?>>();
+		map.put("stars", starsList);
+		map.put("hotelRoom", hotelRoomList);
+		map.put("food", foodList);
+		map.put("nights", nightsList);
+		map.put("fromToDate", fromToDateList);
+
+		return map;
+
+	}
+
+	public static ArrayList<Hotel> getHotels() throws IOException {
+		submitForm();
+
+		ArrayList<Hotel> hotelList = new ArrayList<Hotel>();
+		HtmlPage newPage = getFirstPage();
+
+		clickMore(newPage);
+		getInfo(newPage);
+
+		HashMap<String, ArrayList<String>> nameMap = getName(newPage);
+		HashMap<String, ArrayList<Integer>> priceMap = getPrices(newPage);
+		HashMap<String, ArrayList<?>> mainInfoMap = getInfo(newPage);
+
+		for (int i = 0; i < nameMap.get("country").size(); ++i) {
+			int fPrice = priceMap.get("fPrice").get(i);
+			int bPrice = priceMap.get("bPrice").get(i);
+			String country = nameMap.get("country").get(i);
+			String town = nameMap.get("town").get(i);
+			String townFrom = nameMap.get("townFrom").get(i);
+			int stars = (int) mainInfoMap.get("stars").get(i);
+			String hotelRoom = (String) mainInfoMap.get("hotelRoom").get(i);
+			String food = (String) mainInfoMap.get("food").get(i);
+			int nights = (int) mainInfoMap.get("nights").get(i);
+			String fromToDate = (String) mainInfoMap.get("fromToDate").get(i);
+
+			hotelList.add(
+					new Hotel(fPrice, bPrice, country, town, townFrom, stars, hotelRoom, food, nights, fromToDate));
+		}
+
+		webClient.close();
+
+		return hotelList;
 	}
 
 	private static void show(ArrayList<Integer> fPrice, ArrayList<Integer> bPrice) {
@@ -143,17 +253,6 @@ public class HtmlService {
 				System.out.println("-");
 		}
 		System.out.println("size:" + fPrice.size());
-	}
-
-	public static void getHotels() throws IOException {
-		submitForm();
-		
-
-//		clickMore(newPage);
-
-		getPrices(getFirstPage());
-
-		webClient.close();
 	}
 
 	private static void sleep() {
