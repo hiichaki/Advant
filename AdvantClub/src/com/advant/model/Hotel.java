@@ -12,11 +12,10 @@ public class Hotel {
 	private String food;
 	private int nights;
 	private String fromToDate;
-	
-
+	private String link;
 	
 	public Hotel(int fPrice, int bPrice, String country, String town, String townFrom, int stars, String hotelRoom,
-			String food, int nights, String fromToDate) {
+			String food, int nights, String fromToDate, String link) {
 		this.fPrice = fPrice;
 		this.bPrice = bPrice;
 		this.country = country;
@@ -27,16 +26,27 @@ public class Hotel {
 		this.food = food;
 		this.nights = nights;
 		this.fromToDate = fromToDate;
+		this.link = link;
 	}
 
-	
 	@Override
 	public String toString() {
 		return "Hotel [fPrice=" + fPrice + ", bPrice=" + bPrice + ", country=" + country + ", town=" + town
 				+ ", townFrom=" + townFrom + ", stars=" + stars + ", hotelRoom=" + hotelRoom + ", food=" + food
-				+ ", nights=" + nights + ", fromToDate=" + fromToDate + "]";
+				+ ", nights=" + nights + ", fromToDate=" + fromToDate + ", link=" + link + "]";
 	}
 
+	public String getId() {
+		return link.substring(link.indexOf("tours/")+6,link.lastIndexOf("/"));
+	}
+	
+	public String getLink() {
+		return link;
+	}
+
+	public void setLink(String link) {
+		this.link = link;
+	}
 
 	public String getFromToDate() {
 		return fromToDate;

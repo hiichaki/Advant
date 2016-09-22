@@ -2,7 +2,10 @@ package com.advant.service;
 
 import java.io.IOException;
 import java.net.URL;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 
 import com.advant.model.Hotel;
@@ -27,14 +30,19 @@ import com.gargoylesoftware.htmlunit.util.NameValuePair;
 
 public class HtmlService {
 
-	private static final WebClient webClient = new WebClient(BrowserVersion.CHROME);
+	private static final WebClient WEB_CLIENT = new WebClient(BrowserVersion.CHROME);
+	private static String REQUEST_URL = null;
+
+	public static String getRequestURL() {
+		return REQUEST_URL;
+	}
 
 	private static void submitForm() {
 		try {
-			webClient.getOptions().setJavaScriptEnabled(true);
-			webClient.getOptions().setDoNotTrackEnabled(true);
+			WEB_CLIENT.getOptions().setJavaScriptEnabled(true);
+			WEB_CLIENT.getOptions().setDoNotTrackEnabled(true);
 
-			final HtmlPage page1 = webClient.getPage(StaticVars.SITE);
+			final HtmlPage page1 = WEB_CLIENT.getPage(StaticVars.SITE);
 
 			final HtmlForm form = page1.getHtmlElementById("sky-form");
 			final HtmlSubmitInput button = form.getInputByValue("Войти");
@@ -62,12 +70,17 @@ public class HtmlService {
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private static HtmlPage getPageByRequest() throws FailingHttpStatusCodeException, IOException {
-		WebRequest requestSettings = new WebRequest(new URL("https://advant.club/ua/search/"), HttpMethod.GET);
+		WebRequest requestSettings = new WebRequest(new URL(StaticVars.SITE_SEARCH), HttpMethod.GET);
+
+		DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+		// get current date time with Date()
+		Date date = new Date();
+		System.out.println(dateFormat.format(date));
 
 		requestSettings.setRequestParameters(new ArrayList());
 		requestSettings.getRequestParameters().add(new NameValuePair("country", "318"));
-		requestSettings.getRequestParameters().add(new NameValuePair("date_from", "18.09.2016"));
-		requestSettings.getRequestParameters().add(new NameValuePair("date_till", "30.09.2016"));
+		requestSettings.getRequestParameters().add(new NameValuePair("date_from", "22.09.2016"));
+		requestSettings.getRequestParameters().add(new NameValuePair("date_till", "15.10.2016"));
 		requestSettings.getRequestParameters().add(new NameValuePair("night_from", "7"));
 		requestSettings.getRequestParameters().add(new NameValuePair("night_till", "30"));
 		requestSettings.getRequestParameters().add(new NameValuePair("adult_amount", "2"));
@@ -81,7 +94,14 @@ public class HtmlService {
 		requestSettings.getRequestParameters().add(new NameValuePair("price_from", "0"));
 		requestSettings.getRequestParameters().add(new NameValuePair("price_till", "1000"));
 
-		return webClient.getPage(requestSettings);
+		StringBuilder request = new StringBuilder();
+		request.append(StaticVars.SITE_SEARCH + "?");
+		for (NameValuePair param : requestSettings.getRequestParameters()) {
+			request.append(param + "&");
+		}
+		request.deleteCharAt(request.length() - 1);
+		REQUEST_URL = request.toString();
+		return WEB_CLIENT.getPage(requestSettings);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -118,13 +138,15 @@ public class HtmlService {
 	}
 
 	@SuppressWarnings("unchecked")
-	private static HashMap<String, ArrayList<Integer>> getPrices(HtmlPage newPage) throws IOException {
+	private static HashMap<String, ArrayList<?>> getPrices(HtmlPage newPage) throws IOException {
 		ArrayList<Integer> fPrice = new ArrayList<Integer>();
 		ArrayList<Integer> bPrice = new ArrayList<Integer>();
+		ArrayList<String> links = new ArrayList<String>();
 		ArrayList<HtmlAnchor> hrefList = (ArrayList<HtmlAnchor>) newPage.getByXPath(StaticVars.F_PRICE_HREF);
 		System.out.println("start anchoring");
 		int i = 0;
 		for (HtmlAnchor href : hrefList) {
+			links.add(href.asXml().substring(href.asXml().indexOf("\"") + 1, href.asXml().indexOf("\"", 20)));
 			fPrice.add(StringUtils.getNumber(href.asText()));
 			HtmlPage tmpHref = href.click();
 
@@ -137,10 +159,10 @@ public class HtmlService {
 		}
 		System.out.println("done anchoring");
 
-		HashMap<String, ArrayList<Integer>> map = new HashMap<String, ArrayList<Integer>>();
+		HashMap<String, ArrayList<?>> map = new HashMap<String, ArrayList<?>>();
 		map.put("fPrice", fPrice);
 		map.put("bPrice", bPrice);
-		show(fPrice, bPrice);
+		map.put("links", links);
 		return map;
 
 	}
@@ -206,7 +228,7 @@ public class HtmlService {
 
 	}
 
-	public static ArrayList<Hotel> getHotels() throws IOException {
+	public static ArrayList<Hotel> getHotels() {
 		submitForm();
 
 		ArrayList<Hotel> hotelList = new ArrayList<Hotel>();
@@ -216,43 +238,35 @@ public class HtmlService {
 		getInfo(newPage);
 
 		HashMap<String, ArrayList<String>> nameMap = getName(newPage);
-		HashMap<String, ArrayList<Integer>> priceMap = getPrices(newPage);
-		HashMap<String, ArrayList<?>> mainInfoMap = getInfo(newPage);
+		HashMap<String, ArrayList<?>> priceMap;
+		try {
+			priceMap = getPrices(newPage);
+			HashMap<String, ArrayList<?>> mainInfoMap = getInfo(newPage);
 
-		for (int i = 0; i < nameMap.get("country").size(); ++i) {
-			int fPrice = priceMap.get("fPrice").get(i);
-			int bPrice = priceMap.get("bPrice").get(i);
-			String country = nameMap.get("country").get(i);
-			String town = nameMap.get("town").get(i);
-			String townFrom = nameMap.get("townFrom").get(i);
-			int stars = (int) mainInfoMap.get("stars").get(i);
-			String hotelRoom = (String) mainInfoMap.get("hotelRoom").get(i);
-			String food = (String) mainInfoMap.get("food").get(i);
-			int nights = (int) mainInfoMap.get("nights").get(i);
-			String fromToDate = (String) mainInfoMap.get("fromToDate").get(i);
+			for (int i = 0; i < nameMap.get("country").size(); ++i) {
+				int fPrice = (int) priceMap.get("fPrice").get(i);
+				int bPrice = (int) priceMap.get("bPrice").get(i);
+				String link = (String) priceMap.get("links").get(i);
+				String country = nameMap.get("country").get(i);
+				String town = nameMap.get("town").get(i);
+				String townFrom = nameMap.get("townFrom").get(i);
+				int stars = (int) mainInfoMap.get("stars").get(i);
+				String hotelRoom = (String) mainInfoMap.get("hotelRoom").get(i);
+				String food = (String) mainInfoMap.get("food").get(i);
+				int nights = (int) mainInfoMap.get("nights").get(i);
+				String fromToDate = (String) mainInfoMap.get("fromToDate").get(i);
 
-			hotelList.add(
-					new Hotel(fPrice, bPrice, country, town, townFrom, stars, hotelRoom, food, nights, fromToDate));
+				hotelList.add(new Hotel(fPrice, bPrice, country, town, townFrom, stars, hotelRoom, food, nights,
+						fromToDate, link));
+			}
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 
-		webClient.close();
+		WEB_CLIENT.close();
 
 		return hotelList;
-	}
-
-	private static void show(ArrayList<Integer> fPrice, ArrayList<Integer> bPrice) {
-		for (int i = 0; i < fPrice.size() - 1; ++i) {
-			int a = fPrice.get(i);
-			int b = bPrice.get(i);
-			System.out.print(a + " : " + b + " ");
-			if (a == b)
-				System.out.println("=");
-			if (a > b)
-				System.out.println("+");
-			if (a < b)
-				System.out.println("-");
-		}
-		System.out.println("size:" + fPrice.size());
 	}
 
 	private static void sleep() {

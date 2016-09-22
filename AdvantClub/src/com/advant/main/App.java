@@ -1,10 +1,11 @@
 package com.advant.main;
 
-import java.io.IOException;
+import java.util.ArrayList;
 
 import com.advant.model.Hotel;
 import com.advant.service.HtmlService;
 import com.advant.utils.HTMLUtils;
+import com.advant.utils.StaticVars;
 
 public class App {
 
@@ -22,27 +23,40 @@ public class App {
 			start();
 		}
 	}
-	
+
 	private static void start() {
 		long startTime = System.nanoTime();
 
 		removeWarnings();
 
 		System.out.println("start");
+		ArrayList<Hotel> hotels = HtmlService.getHotels();
 
-		try {
-			for(Hotel hotel: HtmlService.getHotels()) {
-				System.out.println(hotel);
-			}
-			
-			
-		} catch (IOException e) {
-			e.printStackTrace();
+		for (Hotel hotel : hotels) {
+			System.out.println(hotel);
+		}
+		
+		for(Hotel hotel:hotels) {
+			show(hotel);
 		}
 
 		System.out.println("closed");
 
 		getTime(startTime, System.nanoTime());
+	}
+
+	private static void show(Hotel hotel) {
+		int fPrice = hotel.getfPrice();
+		int bPrice = hotel.getbPrice();
+		System.out.print(fPrice + " : " + bPrice + " ");
+		if (fPrice == bPrice)
+			System.out.println("=");
+		if (fPrice > bPrice) {
+			System.out.println("+  " + StaticVars.SITE_CREATE + hotel.getId());
+		}
+		if (fPrice < bPrice)
+			System.out.println("-");
+
 	}
 
 }
